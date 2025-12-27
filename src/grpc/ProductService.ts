@@ -3,6 +3,7 @@ import { Effect, RequestResolver } from "effect";
 import { ConnectRpcService } from "./ConnectRpcService";
 import { DataLoaderConfigService } from "./DataLoaderConfig";
 import { GetProduct, ProductResolver, type GetProductByIdRequest } from "./resolvers/GetProduct";
+import { RequestContext } from "./AuthContext";
 
 export class ProductService extends Effect.Service<ProductService>()(
 	"ProductService",
@@ -10,6 +11,9 @@ export class ProductService extends Effect.Service<ProductService>()(
 
 		scoped: Effect.gen(function* () {
 			const configService = yield* DataLoaderConfigService;
+			const requestContext = yield* RequestContext;
+			yield* Effect.logInfo("Constructing ProductService for the token: " + requestContext.accessToken)
+			yield* Effect.addFinalizer(() => Effect.logInfo("Destroying ProductService for the token: " + requestContext.accessToken))
 
 
 			const productResolver = yield* ProductResolver.pipe(

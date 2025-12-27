@@ -12,6 +12,7 @@ import { Effect, Layer, Logger, LogLevel } from "effect";
 import { ConnectRpcTransportService } from "./grpc/ConnectRpcService";
 import { DataLoaderConfigService } from "./grpc/DataLoaderConfig";
 import { YogaApp } from "./yoga-app";
+import { AccessTokenBasedServices } from "./context";
 
 // Graceful shutdown handlers
 process.on("SIGTERM", () => {
@@ -26,6 +27,7 @@ process.on("SIGINT", () => {
 
 // Provide services in dependency order (right to left)
 const AppLayer = YogaApp.Default.pipe(
+	Layer.provide(AccessTokenBasedServices.Default),
 	Layer.provide(ConnectRpcTransportService.Default),
 	Layer.provide(DataLoaderConfigService.Default),
 );

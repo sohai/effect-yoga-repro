@@ -1,8 +1,7 @@
 import { Context } from "effect";
 
 export interface RequestContextType {
-	readonly accessToken: string;
-	readonly signal: AbortSignal;
+	readonly accessToken: string
 }
 
 // Context to hold the access token for the current request
@@ -13,9 +12,7 @@ export class RequestContext extends Context.Tag("RequestContext")<
 
 // Convenience function to provide auth context
 export const withRequestContext = ({
-	accessToken,
-	signal,
+	accessToken
 }: {
 	accessToken: string;
-	signal: AbortSignal;
-}) => RequestContext.of({ accessToken, signal });
+}) => RequestContext.of({ accessToken });

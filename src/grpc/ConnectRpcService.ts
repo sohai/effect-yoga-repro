@@ -41,10 +41,10 @@ export class ConnectRpcService extends Effect.Service<ConnectRpcService>()(
 				product: {
 					getProducts: (ids: string[]) =>
 						Effect.tryPromise({
-							try: () =>
+							try: (signal) =>
 								transport.productClient.getProductsByIds(ids, {
 									headers: { accessToken: requestContext.accessToken },
-									signal: requestContext.signal,
+									signal: signal,
 								}),
 							catch: (e) => e as Error,
 						}),
@@ -55,15 +55,13 @@ export class ConnectRpcService extends Effect.Service<ConnectRpcService>()(
 ) {
 	// Static method to create layer with request context - CALLED PER REQUEST
 	static MakeWithRequestContext = ({
-		accessToken,
-		signal,
+		accessToken
 	}: {
 		accessToken: string;
-		signal: AbortSignal;
 	}) => {
 		return Layer.provide(
 			ConnectRpcService.Default,
-			Layer.succeed(RequestContext, { accessToken, signal }),
+			Layer.succeed(RequestContext, { accessToken }),
 		);
 	};
 }
