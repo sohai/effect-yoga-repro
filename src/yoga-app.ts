@@ -7,34 +7,15 @@
  * 3. Bun.serve is managed with acquireRelease for graceful shutdown
  */
 
-import type { Plugin } from "graphql-yoga";
+import type { Plugin, YogaInitialContext } from "graphql-yoga";
 import { createYoga, useExecutionCancellation } from "graphql-yoga";
-import { Config, Effect } from "effect";
-import { createContext, type GraphQLContext } from "./context";
-import { ConnectRpcTransportService } from "./grpc/ConnectRpcService";
+import { Config, Effect, Layer, Runtime } from "effect";
+import { AccessTokenBasedServices, RuntimeContext, type GraphQLContext } from "./context";
 import { DataLoaderConfigService } from "./grpc/DataLoaderConfig";
 import { schema } from "./schema";
 
 export type { GraphQLContext };
 
-// Plugin to cleanup ManagedRuntime after each request
-export const runtimeCleanupPlugin: Plugin<GraphQLContext> = {
-	onExecute() {
-		return {
-			async onExecuteDone(payload) {
-				// This runs after the execution phase is complete
-				const context = payload.args.contextValue;
-				if (context.runtime) {
-					try {
-						await context.runtime.dispose();
-					} catch (error) {
-						console.error("Error disposing runtime:", error);
-					}
-				}
-			},
-		};
-	},
-};
 
 const GraphqlConfig = Config.all({
 	port: Config.integer("GRAPHQL_PORT").pipe(Config.withDefault(4000)),
@@ -47,20 +28,30 @@ const GraphqlConfig = Config.all({
 export class YogaApp extends Effect.Service<YogaApp>()("YogaApp", {
 	scoped: Effect.gen(function* () {
 		const config = yield* GraphqlConfig;
-
-		// Yield shared services - these are provided via Layer
-		const dataLoaderConfigService = yield* DataLoaderConfigService;
-		const grpcConnectTransportService = yield* ConnectRpcTransportService;
+		const runtime = yield* Effect.runtime<DataLoaderConfigService | AccessTokenBasedServices>()
 
 		const yoga = createYoga({
 			schema,
 			maskedErrors: false,
-			context: createContext(
-				grpcConnectTransportService,
-				dataLoaderConfigService,
-			),
+			context: async (initialContext: YogaInitialContext): Promise<GraphQLContext> => {
+				const authHeader = initialContext.request.headers.get("authorization") ?? "";
+				const accessToken = authHeader.replace("Bearer ", "");
+		
+				console.log(`\n[Context] Creating context for request with token="${accessToken}"`);		
+				
+		
+				const runPromise = <A, E>(effect: Effect.Effect<A, E, RuntimeContext>) => {
+					// Effect.provide should'nt be generally used more than 1 time in your entire application, UNLESS, you use a LayerMap
+					return Runtime.runPromise(runtime, effect.pipe(Effect.provide(AccessTokenBasedServices.get(accessToken))));
+				};
+		
+				return {
+					...initialContext,
+					runPromise
+				};
+			},
 			graphqlEndpoint: config.endpoint,
-			plugins: [runtimeCleanupPlugin, useExecutionCancellation()],
+			plugins: [useExecutionCancellation()],
 		});
 
 		yield* Effect.logInfo(
